@@ -160,7 +160,7 @@ tujuan. Dua lapis pembuktian dipakai di sini:
 
 **Setup** (sekali di awal, atau setelah `docker compose down -v`):
 ```bash
-cd PPJ_AL_KEL2_UJI         # masuk dalam folder proyek
+cd actionLearning_messageBroker-main         # masuk dalam folder proyek
 cp .env.contoh .env        # salin konfigurasi contoh; TIDAK ada kredensial produksi
 npm install
 
