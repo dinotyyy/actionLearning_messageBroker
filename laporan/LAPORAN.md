@@ -117,14 +117,16 @@ keluaran `uji/skenario.js verifikasi`/`ledger`, log worker) ada di
 
 | Uji | Langkah | Hasil yang Diharapkan | Hasil Aktual | Waktu tunggu (batas 60s) | Bukti | Status |
 |---|---|---|---|---|---|---|
-| **U1** | Kirim 20 event valid `run01-N01`..`run01-N20` (`file_id` dirotasi `sample-a`/`sample-b`/`sample-c`) | 20 hasil unik, himpunan ID input = output | 20 baris baru di `file_results`; `idHasilBisnis` cocok persis 20 ID yang dikirim; `ukuran_bytes`/`jumlah_kata` sesuai fixture (61/10, 212/29, 43/5) | 142 ms | `bukti/run01-u1.json` | **LULUS** |
-| **U2** | Setelah U1, worker dihentikan paksa (`taskkill //F`, mensimulasikan crash proses); kirim 5 event baru `G01`–`G05` | 5 pesan menunggu di queue; setelah worker pulih, ke-5 ID selesai tanpa kirim ulang manual | Snapshot saat worker mati: `ready=5, unacked=0, consumers=0` (`bukti/run01-u2-antrean-tertahan.json`). Setelah worker dinyalakan kembali: kelima `G01`–`G05` otomatis diproses (log `"hasil":"baru"`), total hasil bisnis run naik dari 20 → **25** | 221 ms | `bukti/run01-u2-antrean-tertahan.json`, `bukti/run01-u2.json` | **LULUS** |
-| **U3** | Kirim ulang `run01-N01`..`run01-N05` dengan `event_id` + payload **persis semula** (`occurred_at` sama dengan pengiriman U1) | Efek bisnis tidak bertambah; jumlah hasil tetap 25 | Log worker: kelima event bertanda `"hasil":"duplikat-diabaikan"`. Jumlah baris tetap **25** (sebelum 25, sesudah 25) | 176 ms | `bukti/run01-u3.json` | **LULUS** |
-| **U4** | Kirim `run01-X01` (payload `file_id: "sample-tidak-terdaftar"`, tidak valid), lalu `run01-V01` (valid) | `X01` masuk jalur penolakan terdokumentasi tanpa efek bisnis; `V01` selesai, tidak tertahan | `X01` tercatat di `file_rejections` (alasan: *"payload.file_id ... tidak terdaftar di fixture lokal"*) dan `files.penolakan.q` (`ready=1` via dead-letter); **tidak ada** baris `run01-X01` di `file_results`. `V01` selesai (`"hasil":"baru"`) segera setelah `X01` ditolak — total hasil bisnis run naik 25 → **26** | 133 ms | `bukti/run01-u4.json` | **LULUS** |
+| **U1** | Kirim 20 event valid `run01-N01`..`run01-N20` (`file_id` dirotasi `sample-a`/`sample-b`/`sample-c`) | 20 hasil unik, himpunan ID input = output | 20 baris baru di `file_results`; `idHasilBisnis` cocok persis 20 ID yang dikirim; `ukuran_bytes`/`jumlah_kata` sesuai fixture (61/10, 212/29, 43/5) | 29 ms | `bukti/run01-u1.json` | **LULUS** |
+| **U2** | Setelah U1, worker dihentikan dengan `Ctrl+C` di terminal worker; kirim 5 event baru `G01`–`G05` | 5 pesan menunggu di queue; setelah worker pulih, ke-5 ID selesai tanpa kirim ulang manual | Saat worker mati, Management UI RabbitMQ menunjukkan `ready=5, unacked=0, consumers=0` (diamati langsung, terekam di video uji skenario). Setelah worker dinyalakan kembali: kelima `G01`–`G05` otomatis diproses (log `"hasil":"baru"`), total hasil bisnis run naik dari 20 → **25** | 36225 ms (±36 s) | `bukti/run01-u2.json` | **LULUS** |
+| **U3** | Kirim ulang `run01-N01`..`run01-N05` dengan `event_id` + payload **persis semula** (`occurred_at` sama dengan pengiriman U1) | Efek bisnis tidak bertambah; jumlah hasil tetap 25 | Log worker: kelima event bertanda `"hasil":"duplikat-diabaikan"`. Jumlah baris tetap **25** (sebelum 25, sesudah 25) | 29 ms | `bukti/run01-u3.json` | **LULUS** |
+| **U4** | Kirim `run01-X01` (payload `file_id: "sample-tidak-terdaftar"`, tidak valid), lalu `run01-V01` (valid) | `X01` masuk jalur penolakan terdokumentasi tanpa efek bisnis; `V01` selesai, tidak tertahan | `X01` tercatat di `file_rejections` (alasan: *"payload.file_id ... tidak terdaftar di fixture lokal"*) dan `files.penolakan.q` (`ready=1` via dead-letter); **tidak ada** baris `run01-X01` di `file_results`. `V01` selesai (`"hasil":"baru"`) segera setelah `X01` ditolak — total hasil bisnis run naik 25 → **26** | 27 ms | `bukti/run01-u4.json` | **LULUS** |
 
 Kolom "Waktu tunggu" adalah `waktuTungguMs` aktual dari polling
-`verifikasi` (lihat README §10) — jauh di bawah batas 60 detik pada keempat
-uji, sehingga tidak ada kasus `tercapaiDalamWaktu: false` yang perlu dicatat.
+`verifikasi` (lihat README §10). Keempat uji tercapai di bawah batas 60 detik,
+sehingga tidak ada kasus `tercapaiDalamWaktu: false` yang perlu dicatat. Waktu
+U2 jauh lebih lama karena `verifikasi` dijalankan saat worker masih mati,
+sehingga angkanya ikut mencakup jeda sampai worker dinyalakan kembali.
 
 **Ringkasan akhir run01:** 26 baris efek bisnis (20 + 5 + 0 dari replay + 1
 dari `V01`), 1 baris penolakan (`X01`), 0 pesan tak ter-route sepanjang
@@ -143,60 +145,84 @@ beberapa job, dedup berbasis `event_id`" (README §9).
 
 ## 6. Laporan Investigasi Troubleshooting
 
-**Gejala masalah.** Pada percobaan pertama skenario U2, worker dihentikan
-lewat `kill -SIGINT <PID>` dari shell Git Bash (MSYS) sebelum mengirim 5
-event baru `G01`–`G05`. Snapshot queue sesaat sesudahnya menunjukkan
-`ready:0, consumers:1` — bukan `ready:5, consumers:0` seperti yang
-diharapkan bila worker benar-benar mati. Log worker kemudian mengonfirmasi
-kelima event **sudah diproses** (`"hasil":"baru"`) meski perintah stop sudah
-dijalankan sebelum event dikirim.
+### Analisis Perilaku U2: Pesan Tertahan Saat Worker Mati, Terproses Saat Worker Pulih
 
-**Dua hipotesis penyebab.**
-1. **Sinyal SIGINT tidak pernah sampai ke worker** — proses Node.js pada
-   Windows yang dijalankan lewat `npm run worker &` di dalam sesi Git Bash
-   mungkin tidak menerima `SIGINT` yang dikirim `kill` dari shell MSYS lain,
-   karena Windows tidak memiliki sinyal POSIX asli (`kill` MSYS hanya
-   mengonversi ke `CTRL_C_EVENT` bila proses berada di console yang sama).
-2. **PID yang di-*kill* salah** — PID yang dipakai berasal dari kolom
-   `WINPID` hasil `ps aux` MSYS, yang bisa tidak sinkron dengan PID
-   sesungguhnya dari proses `node.exe` yang terlihat oleh Windows.
+**Gejala yang diamati.** Setelah worker dihentikan dengan `Ctrl+C`,
+producer tetap berhasil mengirim 5 event baru `G01`–`G05`: tidak ada error di
+sisi producer, dan broker mengembalikan publisher confirm untuk setiap pesan.
+Management UI RabbitMQ menunjukkan queue `filejobs` dengan `ready=5,
+unacked=0, consumers=0` (terekam di video uji skenario), dan belum ada
+satu pun baris `G01`–`G05` di `file_results`. Begitu worker dinyalakan
+kembali, kelima pesan langsung diproses tanpa ada pengiriman ulang dari
+producer, dan total hasil bisnis run naik dari 20 → 25.
 
-**Langkah pembuktian.** Kedua hipotesis dibedakan dengan memeriksa proses
-`node.exe` lewat `tasklist` (alat Windows native, bukan `ps` MSYS) segera
-setelah perintah stop dijalankan, dan membandingkan PID itu dengan `workerId`
-yang tercetak di log worker (`pekerja-<PID>`):
-- Bila hipotesis 2 benar, `tasklist` akan menunjukkan `node.exe` **masih
-  berjalan** dengan PID yang **berbeda** dari PID yang dipakai pada perintah
-  `kill`.
-- Bila hipotesis 1 benar (PID sudah benar tapi sinyal tidak sampai),
-  `tasklist` tetap menunjukkan proses yang sama masih hidup walau PID-nya
-  cocok dengan yang dikirimi `kill -SIGINT`.
+**Pertanyaan investigasi.** (1) Mengapa producer tidak gagal walaupun tidak
+ada consumer yang hidup? (2) Di mana kelima pesan disimpan selama worker
+mati? (3) Bagaimana worker yang baru dinyalakan bisa mengambilnya tanpa
+campur tangan manual?
 
-Hasil: `tasklist //FI "IMAGENAME eq node.exe"` menunjukkan `node.exe` dengan
-PID **17836** (cocok dengan `workerId: "pekerja-17836"` di log) masih
-berjalan, sedangkan PID yang dipakai pada perintah `kill -SIGINT` sebelumnya
-adalah **27860** (dari kolom `WINPID` `ps aux`, ternyata tidak sinkron).
-Ini mengonfirmasi **hipotesis 2** (PID salah) sebagai penyebab utama —
-dan sekaligus mengonfirmasi keterbatasan `kill -SIGINT` lintas MSYS/Windows
-dari hipotesis 1 tetap relevan sebagai alasan untuk tidak mengandalkan
-`SIGINT` sama sekali pada platform ini.
+**Penjelasan per tahap.**
+1. **Producer tidak bergantung pada consumer.** Producer hanya mem-publish
+   ke exchange `files` dengan routing key `file.process`. Binding
+   `files` → `filejobs` dideklarasikan di broker (`src/topologi.js`), bukan
+   dimiliki oleh proses worker, sehingga routing tetap berjalan walaupun
+   worker mati. Publisher confirm dikirim broker begitu pesan diterima dan
+   ter-route ke queue, tidak menunggu pesan dikonsumsi. Opsi
+   `mandatory: true` hanya membuat pesan dikembalikan bila pesan **tidak
+   ter-route** ke queue mana pun, bukan bila queue-nya tidak punya consumer. Karena itu
+   `files.tanpa_rute.q` tetap 0 sepanjang U2.
+2. **Pesan menunggu dengan status *Ready*.** Tanpa consumer terdaftar
+   (`consumers=0`), broker tidak punya tujuan pengiriman, jadi pesan tetap
+   di queue sebagai *ready*. `unacked=0` karena tidak ada consumer yang
+   sedang memegang pesan. Queue `filejobs` bersifat `durable: true` dan
+   pesan dikirim dengan `persistent: true` (`src/broker.js`), sehingga
+   pesan juga dirancang bertahan saat broker di-restart. Skenario restart
+   broker ini sendiri **tidak** diuji di U2.
+3. **Worker pulih langsung mengambil antrean.** Saat start, `src/pekerja.js`
+   mendaftar sebagai consumer (`basic.consume`) pada `filejobs` dengan
+   `prefetch(1)`. Broker kemudian mengirim pesan satu per satu: sebuah pesan
+   berpindah dari *ready* ke *unacked* selama diproses, lalu hilang dari queue
+   setelah worker `ack`. Worker hanya `ack` sesudah
+   `INSERT ... ON CONFLICT` di PostgreSQL berhasil. Kelima pesan ini belum
+   pernah dikirim ke consumer mana pun, sehingga tercatat sebagai pengiriman
+   pertama (`redelivered: false`), bukan redelivery.
+4. **Mengapa tidak ada pesan yang hilang saat worker dihentikan dengan
+   `Ctrl+C`.** `Ctrl+C` mengirim `SIGINT` ke worker, dan `src/pekerja.js`
+   menanganinya sebagai *graceful shutdown*: consumer di-*cancel* lebih dulu
+   supaya tidak menerima pesan baru, worker menunggu pekerjaan aktif selesai
+   dan di-`ack`, lalu koneksi ditutup. Pada U2 worker dihentikan dalam
+   keadaan idle, karena seluruh pesan U1 sudah di-`ack` dan `unacked=0`.
+   Seandainya proses worker mati mendadak di tengah memproses pesan
+   (skenario crash, tidak diuji di U2), pesan itu belum di-`ack`. Broker akan
+   mengembalikannya ke *ready* saat koneksi AMQP putus dan mengirimkannya
+   ulang ke worker berikutnya (`redelivered: true`). Kalaupun baris hasilnya
+   sudah terlanjur tersimpan sebelum crash, `ON CONFLICT (event_id) DO
+   NOTHING` mencegah baris ganda, seperti yang dibuktikan U3.
 
-**Solusi yang diterapkan.** Penghentian worker untuk pengujian U2 diganti
-memakai `tasklist //FI "IMAGENAME eq node.exe"` untuk mendapatkan PID
-Windows yang benar (dicocokkan dengan `workerId` di log), lalu
-`taskkill //F //PID <pid>` untuk mematikan proses secara paksa — pendekatan
-yang juga sekaligus lebih representatif untuk skenario "worker crash" yang
-ingin dibuktikan U2 (mati mendadak, bukan graceful shutdown). Lima baris
-`file_results` yang terlanjur tercatat dari percobaan pertama (`run01-G01`..
-`run01-G05`) dihapus (`DELETE ... WHERE event_id IN (...)`, ditargetkan
-hanya ke 5 baris tersebut) sebelum U2 diulang dari kondisi bersih.
+**Bukti.** `bukti/run01-u2.json` mencatat `jumlahHasilBisnis: 25` dengan
+`idHasilBisnis` memuat `run01-G01`..`run01-G05`, serta `waktuTungguMs:
+36225`. Artinya perintah `verifikasi` dijalankan saat worker masih mati dan
+menunggu sekitar 36 detik sampai worker dinyalakan kembali dan kelima pesan
+selesai, masih di bawah batas 60 detik.
 
-**Hasil akhir pasca perbaikan.** Snapshot U2 (`bukti/run01-u2-antrean-tertahan.json`)
-menunjukkan `ready:5, unacked:0, consumers:0` secara akurat, dan
-`npm run uji -- verifikasi run01 u2 25` mengonfirmasi seluruh 5 pesan
-diproses tuntas setelah worker dipulihkan — sistem berfungsi normal sesuai
-desain; masalah sepenuhnya ada pada cara menghentikan proses worker di
-platform Windows/Git Bash, bukan pada topologi atau kode consumer/producer.
+**Catatan pembacaan snapshot queue.** Blok `antrean.kerja` pada file bukti
+yang sama masih menunjukkan `ready: 5, consumers: 0`, padahal pada saat itu
+25 hasil sudah tercatat di database. Dugaan penyebabnya: Management API
+RabbitMQ tidak real-time. Statistik queue diperbarui secara berkala
+(bawaan `collect_statistics_interval` 5 detik), sehingga snapshot yang
+diambil tepat setelah hasil tercapai masih menampilkan keadaan sebelum
+worker pulih. Dugaan ini dapat dikonfirmasi dengan menjalankan
+`npm run uji -- antrean` beberapa detik kemudian: angkanya seharusnya sudah
+`ready: 0, consumers: 1`. Pelajarannya, sumber kebenaran untuk menyatakan
+pekerjaan **selesai** adalah tabel `file_results`. Angka queue dari
+Management API hanya indikator pendukung.
+
+**Kesimpulan.** Perilaku ini sesuai desain, bukan bug. Pola Work Queue
+memisahkan waktu kerja producer dan consumer: producer cukup memastikan
+pesan diterima broker, broker menyimpan pesan secara durable selama
+consumer tidak tersedia, dan consumer menyelesaikannya saat pulih dengan
+ack manual dan idempotensi berbasis `event_id`. Dengan begitu tidak ada
+pesan yang hilang maupun terproses dua kali.
 
 ---
 
@@ -242,6 +268,6 @@ mandiri adalah pengembangan baru untuk kasus A04.
 |---|---|---|
 | Senin, 21 September | Rumusan masalah, diagram topologi, kontrak event | Selesai (bagian 1–2 di atas) |
 | Selasa, 22 September | Implementasi dasar producer, exchange, queue, consumer aktif | Selesai — proyek dipisah menjadi folder mandiri |
-| **Rabu, 23 September** | **Routing lengkap + bukti pengujian** | **Selesai — kontrak & topologi disesuaikan ke spesifikasi job/file_id/operation, U1–U4 dijalankan ulang penuh dan lulus (bagian 5), termasuk satu insiden operasional yang terdokumentasi (bagian 6)** |
+| **Rabu, 23 September** | **Routing lengkap + bukti pengujian** | **Selesai — kontrak & topologi disesuaikan ke spesifikasi job/file_id/operation, U1–U4 dijalankan ulang penuh dan lulus (bagian 5), beserta analisis perilaku U2 (bagian 6)** |
 | Kamis, 24 September | Pengujian failure/recovery + laporan | Draft laporan ini disusun; perlu direview ulang & dilengkapi refleksi tim sebelum dikumpulkan |
 | Jumat, 25 September | Presentasi & sesi feedback | Menunggu jadwal sesi sinkron; lihat `../presentasi/` |

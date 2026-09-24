@@ -395,14 +395,16 @@ ledger yang cocok dengan himpunan ID input. Bila target belum tercapai
 dalam batas waktu, itu dicatat apa adanya di field `tercapaiDalamWaktu:
 false` beserta `waktuTungguMs` aktual, tidak disembunyikan.
 
-Hasil nyata run01 (semua tercapai jauh di bawah batas 60 detik):
+Hasil nyata run01 (sesuai `waktuTungguMs` di `bukti/run01-u*.json`; semua
+tercapai di bawah batas 60 detik. U2 lebih lama karena `verifikasi` dijalankan
+saat worker masih mati, sehingga mencakup jeda sampai worker dinyalakan kembali):
 
 | Uji | Ekspektasi | Waktu tunggu aktual | Tercapai? |
 |---|---|---|---|
-| U1 | 20 | 142 ms | ya |
-| U2 | 25 | 221 ms | ya |
-| U3 | 25 | 176 ms | ya |
-| U4 | 26 | 133 ms | ya |
+| U1 | 20 | 29 ms | ya |
+| U2 | 25 | 36225 ms (±36 s) | ya |
+| U3 | 25 | 29 ms | ya |
+| U4 | 26 | 27 ms | ya |
 
 ## 11. Diagram satu halaman
 
