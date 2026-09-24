@@ -1,0 +1,67 @@
+{
+  "run": "run01",
+  "label": "u3",
+  "diverifikasiPada": "2026-09-23T09:51:11.853Z",
+  "perintahUji": "node uji/skenario.js verifikasi run01 u3 25",
+  "jumlahHasilBisnis": 25,
+  "idHasilBisnis": [
+    "run01-G01",
+    "run01-G02",
+    "run01-G03",
+    "run01-G04",
+    "run01-G05",
+    "run01-N01",
+    "run01-N02",
+    "run01-N03",
+    "run01-N04",
+    "run01-N05",
+    "run01-N06",
+    "run01-N07",
+    "run01-N08",
+    "run01-N09",
+    "run01-N10",
+    "run01-N11",
+    "run01-N12",
+    "run01-N13",
+    "run01-N14",
+    "run01-N15",
+    "run01-N16",
+    "run01-N17",
+    "run01-N18",
+    "run01-N19",
+    "run01-N20"
+  ],
+  "jumlahDitolak": 0,
+  "ditolak": [],
+  "antrean": {
+    "kerja": {
+      "queue": "filejobs",
+      "ready": 0,
+      "unacked": 0,
+      "total": 0,
+      "consumers": 1,
+      "diambilPada": "2026-09-23T09:51:11.850Z"
+    },
+    "penolakan": {
+      "queue": "files.penolakan.q",
+      "ready": 0,
+      "unacked": 0,
+      "total": 0,
+      "consumers": 0,
+      "diambilPada": "2026-09-23T09:51:11.853Z"
+    },
+    "tanpaRute": {
+      "queue": "files.tanpa_rute.q",
+      "ready": 0,
+      "unacked": 0,
+      "total": 0,
+      "consumers": 0,
+      "diambilPada": "2026-09-23T09:51:11.853Z"
+    }
+  },
+  "ekspektasi": 25,
+  "sesuaiEkspektasi": true,
+  "batasTungguMs": 60000,
+  "waktuTungguMs": 29,
+  "tercapaiDalamWaktu": true
+}
