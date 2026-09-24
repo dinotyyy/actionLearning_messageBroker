@@ -1,4 +1,4 @@
-# Proyek Action Learning Studi Kasus Pengolahan Berkas (Metadata Hasil Pengolahan)
+# Proyek Action Learning Studi Kasus Pengolahan Berkas
 
 Proyek Action Learning Minggu Kedua, PJJ *Implementasi dan Pengelolaan Message
 Broker untuk Arsitektur Microservices* (BPPK Kemenkeu). Kasus **A04**, pola
